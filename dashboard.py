@@ -718,6 +718,7 @@ def suggest_k(ks, inertias, silhouettes):
 # SVG Icons (clean, minimal design)
 svg_icons = {
     "Dashboard": '''<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>''',
+    "Team": '''<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>''',
     "Input Dataset": '''<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>''',
     "Preprocessing Data": '''<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>''',
     "Analisis Data": '''<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>''',
@@ -736,7 +737,7 @@ st.sidebar.markdown("""
 """, unsafe_allow_html=True)
 
 # Menu items with icons
-menu_items = ["Dashboard", "Input Dataset", "Preprocessing Data", "Analisis Data", "Visualisasi", "Hasil"]
+menu_items = ["Dashboard", "Input Dataset", "Preprocessing Data", "Analisis Data", "Visualisasi", "Hasil", "Team"]
 
 # Initialize session state for page
 if "current_page" not in st.session_state:
@@ -944,6 +945,19 @@ st.sidebar.markdown("""
     width: 18px;
     height: 18px;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23ef4444' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'%3E%3C/path%3E%3Cpolyline points='14 2 14 8 20 8'%3E%3C/polyline%3E%3Cline x1='16' y1='13' x2='8' y2='13'%3E%3C/line%3E%3Cline x1='16' y1='17' x2='8' y2='17'%3E%3C/line%3E%3Cpolyline points='10 9 9 9 8 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+}
+                    [data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label:nth-child(7)::after {
+    content: "";
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23ef4444' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2'%3E%3C/path%3E%3Ccircle cx='9' cy='7' r='4'%3E%3C/circle%3E%3Cpath d='M23 21v-2a4 4 0 0 0-3-3.87'%3E%3C/path%3E%3Cpath d='M16 3.13a4 4 0 0 1 0 7.75'%3E%3C/path%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: center;
     background-size: contain;
@@ -1506,5 +1520,120 @@ elif page == "Hasil":
             st.markdown("""<div class="bullet-item"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg><span>Clustering kualitas sedang (0.3 < silhouette ≤ 0.5)</span></div>""", unsafe_allow_html=True)
         else:
             st.markdown("""<div class="bullet-item" style="background: rgba(245, 158, 11, 0.15); border-left-color: #f59e0b;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg><span style="color: #fde68a;">Clustering kualitas kurang (silhouette ≤ 0.3)</span></div>""", unsafe_allow_html=True)
+    # ===========================================
+# ===========================================
+# PAGE: TIM KAMI (VERSI FINAL: FULL FRAME / WIDTH 100%)
+# ===========================================
+elif page == "Team":
+    import base64 
+
+    # Fungsi helper gambar
+    def img_to_html(img_path):
+        try:
+            if os.path.exists(img_path):
+                with open(img_path, "rb") as f:
+                    data = base64.b64encode(f.read()).decode()
+                return f'<img src="data:image/png;base64,{data}" class="member-img">'
+            else:
+                return f'<img src="https://via.placeholder.com/300x400/1a1a1a/ef4444?text=Foto" class="member-img">'
+        except Exception:
+            return f'<img src="https://via.placeholder.com/300x400/1a1a1a/ef4444?text=Error" class="member-img">'
+
+    st.markdown("""<div class="card"><div class="dashboard-section"><div class="section-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg></div><h3 class="section-title">Tim Pengembang</h3></div><div class="dashboard-content"><p>Berikut adalah anggota tim yang menyusun dashboard analisis clustering ini.</p></div>""", unsafe_allow_html=True)
+    
+    # CSS Style: Foto Full Width (100%)
+    st.markdown("""
+    <style>
+    .member-card {
+        background: linear-gradient(135deg, rgba(30, 30, 30, 0.8) 0%, rgba(20, 20, 20, 0.9) 100%);
+        border: 1px solid rgba(220, 38, 38, 0.3);
+        border-radius: 12px;
+        padding: 12px;             /* Padding dikurangi biar foto makin 'nendang' */
+        text-align: center;
+        transition: all 0.3s ease;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+    }
+    
+    .member-card:hover {
+        transform: translateY(-5px);
+        border-color: #ef4444;
+        box-shadow: 0 10px 30px rgba(220, 38, 38, 0.2);
+    }
+    
+    /* PENGATURAN FOTO FULL */
+    .member-img {
+        height: 320px;               /* TINGGI TETAP: Biar tinggi foto seragam */
+        object-fit: cover;           /* KUNCI: Crop otomatis biar penuh & tidak gepeng */
+        object-position: top center; /* Fokus wajah (atas) */
+        border-radius: 8px;
+        border: 2px solid rgba(220, 38, 38, 0.5);
+        margin-bottom: 12px;
+        display: block;
+    }
+    
+    .member-name {
+        color: #ffffff;
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin-top: 4px;
+        line-height: 1.2;
+    }
+    .member-role {
+        color: #ef4444;
+        font-size: 0.85rem;
+        font-weight: 600;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        margin: 4px 0;
+    }
+    .member-nim {
+        color: #9ca3af;
+        font-size: 0.85rem;
+        font-family: monospace;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns(3)
+
+    # --- ANGGOTA 1 ---
+    with col1:
+        foto_1 = img_to_html("po.jpg") 
+        st.markdown(f"""
+        <div class="member-card">
+            {foto_1}
+            <div class="member-name">Trillen Surya Ningsih</div>
+            <div class="member-role">2311522004</div>
+            <div class="member-nim">Anggota 1</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # --- ANGGOTA 2 ---
+    with col2:
+        foto_2 = img_to_html("teg.jpg")
+        st.markdown(f"""
+        <div class="member-card">
+            {foto_2}
+            <div class="member-name">Zakky Aulia Aldrin</div>
+            <div class="member-role">2311522018</div>
+            <div class="member-nim">Anggota 2</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # --- ANGGOTA 3 ---
+    with col3:
+        foto_3 = img_to_html("sokganteng.jpg")
+        st.markdown(f"""
+        <div class="member-card">
+            {foto_3}
+            <div class="member-name">Dimas Radithya Nurizkitha</div>
+            <div class="member-role">2311523026</div>
+            <div class="member-nim">Anggota 3</div>
+        </div>
+        """, unsafe_allow_html=True)
     
     st.markdown("</div>", unsafe_allow_html=True)
