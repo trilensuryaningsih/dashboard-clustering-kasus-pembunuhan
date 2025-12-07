@@ -1614,7 +1614,7 @@ elif page == "Team":
 
     # --- ANGGOTA 2 ---
     with col2:
-        foto_2 = img_to_html("teg.jpg")
+        foto_2 = img_to_html("plo.png")
         st.markdown(f"""
         <div class="member-card">
             {foto_2}
