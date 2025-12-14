@@ -1,3 +1,27 @@
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║                                                                           ║
+# ║              DASHBOARD CLUSTERING KASUS PEMBUNUHAN                        ║
+# ║                      Analisis Korban dengan K-Means                       ║
+# ║                                                                           ║
+# ║  Dibuat oleh:                                                             ║
+# ║  - Trillen Surya Ningsih (2311522004)                                     ║
+# ║  - Zakky Aulia Aldrin (2311522018)                                        ║
+# ║  - Dimas Radithya Nurizkitha (2311523026)                                 ║
+# ║                                                                           ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║                                                                           ║
+# ║                      SECTION 1: IMPORT LIBRARIES                          ║
+# ║                                                                           ║
+# ║  Library yang digunakan:                                                  ║
+# ║  - Streamlit: Framework dashboard                                         ║
+# ║  - Pandas, NumPy: Manipulasi data                                        ║
+# ║  - Scikit-learn: K-Means, PCA, t-SNE, StandardScaler                     ║
+# ║  - UMAP: Dimensionality reduction (opsional)                              ║
+# ║  - Plotly: Visualisasi interaktif                                         ║
+# ║                                                                           ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
 import os
 import time
 import streamlit as st
@@ -23,17 +47,32 @@ except Exception:
 # Viz
 import plotly.express as px
 
-# ===========================================
-# CONFIG & CONSTANTS
-# ===========================================
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║                                                                           ║
+# ║                    SECTION 2: CONFIG & CONSTANTS                          ║
+# ║                                                                           ║
+# ║  Konfigurasi aplikasi:                                                    ║
+# ║  - DEFAULT_CSV: Path default untuk file dataset                          ║
+# ║  - ACCENT: Warna aksen tema (tidak digunakan aktif)                       ║
+# ║  - Page config: Judul dan layout dashboard                                ║
+# ║                                                                           ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
 DEFAULT_CSV = r"C:\praktikum\homicide-data.csv"
 ACCENT = "#6C5CE7"
 
 st.set_page_config(page_title="Clustering Kasus Pembunuhan", layout="wide")
 
-# ===========================================
-# SPLASH SCREEN / OPENING PAGE
-# ===========================================
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║                                                                           ║
+# ║                   SECTION 3: SPLASH SCREEN / OPENING PAGE                 ║
+# ║                                                                           ║
+# ║  Halaman pembuka dengan animasi loading:                                  ║
+# ║  - Ikon tengkorak dengan efek pulse                                       ║
+# ║  - Judul dan subtitle dengan efek fade-in                                 ║
+# ║  - Spinner loading                                                        ║
+# ║  - Durasi tampil: 3 detik                                                 ║
+# ║                                                                           ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
 if "splash_shown" not in st.session_state:
     st.session_state.splash_shown = False
 
@@ -144,7 +183,17 @@ if not st.session_state.splash_shown:
     st.session_state.splash_shown = True
     st.rerun()
 
-# CSS styling - Modern Dark Theme with Black/Red for Crime Analysis
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║                                                                           ║
+# ║                    SECTION 4: CSS STYLING (MAIN THEME)                    ║
+# ║                                                                           ║
+# ║  Styling untuk seluruh aplikasi:                                         ║
+# ║  - Sidebar: Background gelap, border merah, menu items                   ║
+# ║  - Main content: Background gelap, cards, metric cards                   ║
+# ║  - Typography: Warna teks, heading                                       ║
+# ║  - Components: Buttons, info boxes, recommendations                      ║
+# ║                                                                           ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
 st.markdown(
     """
     <style>
@@ -167,9 +216,16 @@ st.markdown(
         display: none;
     }
     
-    /* Sidebar inner content */
+    /* Sidebar inner content - prevent scrolling */
     [data-testid="stSidebar"] > div:first-child {
-        padding-top: 1.5rem;
+        padding-top: 1rem;
+        overflow: hidden !important;
+        height: 100vh !important;
+    }
+    
+    /* Hide scrollbar on sidebar */
+    [data-testid="stSidebar"] [data-testid="stSidebarContent"] {
+        overflow: hidden !important;
     }
     
     /* Custom sidebar header with SVG */
@@ -178,14 +234,14 @@ st.markdown(
         align-items: center;
         justify-content: center;
         flex-wrap: wrap;
-        gap: 10px;
-        padding: 1.25rem 1rem;
-        margin: 0 0.75rem 1.5rem 0.75rem;
+        gap: 6px;
+        padding: 0.75rem 0.75rem;
+        margin: 0 0.5rem 0.75rem 0.5rem;
         background: linear-gradient(135deg, rgba(220, 38, 38, 0.08) 0%, transparent 100%);
         border: none;
-        border-radius: 12px;
+        border-radius: 10px;
         color: #ffffff;
-        font-size: 1.15rem;
+        font-size: 1rem;
         font-weight: 600;
         letter-spacing: 0.3px;
         position: relative;
@@ -216,8 +272,8 @@ st.markdown(
     
     /* Radio button container */
     [data-testid="stSidebar"] .stRadio > div {
-        gap: 4px;
-        padding: 0 0.75rem;
+        gap: 2px;
+        padding: 0 0.5rem;
     }
     
     /* Hide default radio label */
@@ -229,21 +285,21 @@ st.markdown(
     [data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label {
         background: transparent;
         color: rgba(255, 255, 255, 0.65) !important;
-        padding: 0.75rem 1.25rem;
+        padding: 0.5rem 1rem;
         margin: 0;
-        border-radius: 10px;
+        border-radius: 8px;
         border: 1px solid transparent;
         transition: all 0.25s ease;
         cursor: pointer;
         font-weight: 500;
-        font-size: 0.95rem;
+        font-size: 0.85rem;
         display: flex;
         align-items: center;
         position: relative;
         overflow: hidden;
-        height: 65px;
-        min-height: 65px;
-        max-height: 65px;
+        height: 44px;
+        min-height: 44px;
+        max-height: 44px;
         box-sizing: border-box;
         width: 100% !important;
     }
@@ -554,9 +610,20 @@ st.markdown(
 
 st.markdown("""<div style="display: flex; align-items: center; gap: 16px; margin-bottom: 10px;"><div style="display: flex; align-items: center; justify-content: center; width: 56px; height: 56px; background: linear-gradient(135deg, rgba(220, 38, 38, 0.2) 0%, rgba(185, 28, 28, 0.15) 100%); border-radius: 14px; border: 1px solid rgba(220, 38, 38, 0.4);"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.5));"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></div><div><h1 style="color: #ef4444; font-weight: 700; font-size: 2.2rem; margin: 0;">Clustering Kasus Pembunuhan — Analisis Korban</h1><p style="color: #9ca3af; margin: 4px 0 0 0; font-size: 1rem;">Dashboard interaktif untuk mengelompokkan kasus menurut karakteristik korban. Ikuti alur di sidebar.</p></div></div>""", unsafe_allow_html=True)
 
-# ===========================================
-# SESSION STATE INIT
-# ===========================================
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║                                                                           ║
+# ║                    SECTION 5: SESSION STATE INIT                          ║
+# ║                                                                           ║
+# ║  Inisialisasi state aplikasi untuk menyimpan:                            ║
+# ║  - df_raw: Dataset asli dari CSV                                         ║
+# ║  - df_cleaned: Dataset setelah cleaning                                  ║
+# ║  - df_proc: Dataset setelah processing dengan cluster labels             ║
+# ║  - X_scaled: Data yang sudah di-scale untuk clustering                   ║
+# ║  - feature_cols: Kolom fitur yang digunakan                              ║
+# ║  - cluster_labels: Hasil label clustering                                ║
+# ║  - final_k, suggested_k: Nilai K untuk clustering                        ║
+# ║                                                                           ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
 if "df_raw" not in st.session_state:
     st.session_state.df_raw = pd.DataFrame()
 if "df_cleaned" not in st.session_state:
@@ -580,9 +647,20 @@ if "suggested_k" not in st.session_state:
 if "suggested_method" not in st.session_state:
     st.session_state.suggested_method = None
 
-# ===========================================
-# UTILITY FUNCTIONS
-# ===========================================
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║                                                                           ║
+# ║                     SECTION 6: UTILITY FUNCTIONS                          ║
+# ║                                                                           ║
+# ║  Fungsi-fungsi helper:                                                   ║
+# ║  - robust_read_csv(): Membaca CSV dengan berbagai encoding               ║
+# ║  - load_csv(): Wrapper cached untuk baca CSV                             ║
+# ║  - detect_data_quality_issues(): Deteksi nilai kosong                    ║
+# ║  - recommend_cleaning(): Rekomendasi pembersihan data                    ║
+# ║  - preprocess_with_options(): Preprocessing dengan opsi cleaning         ║
+# ║  - compute_k_metrics(): Hitung Elbow & Silhouette                        ║
+# ║  - suggest_k(): Saran K optimal                                          ║
+# ║                                                                           ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
 def robust_read_csv(path_or_buffer, try_encodings=None):
     if try_encodings is None:
         try_encodings = ["utf-8", "utf-8-sig", "cp1252", "latin-1", "iso-8859-1"]
@@ -711,9 +789,20 @@ def suggest_k(ks, inertias, silhouettes):
             return ks[elbow_idx-1], "elbow"
     return ks[0], "default"
 
-# ===========================================
-# SIDEBAR NAVIGATION WITH SVG ICONS
-# ===========================================
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║                                                                           ║
+# ║                  SECTION 7: SIDEBAR NAVIGATION                            ║
+# ║                                                                           ║
+# ║  Navigasi sidebar dengan menu:                                           ║
+# ║  - Dashboard: Halaman utama                                               ║
+# ║  - Input Dataset: Upload/load CSV                                        ║
+# ║  - Preprocessing Data: Cleaning & feature selection                      ║
+# ║  - Analisis Data: Elbow & Silhouette method                              ║
+# ║  - Visualisasi: Clustering & visualisasi 2D                             ║
+# ║  - Hasil: Kesimpulan & rekomendasi                                       ║
+# ║  - Team: Profil tim pengembang                                           ║
+# ║                                                                           ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
 
 # SVG Icons (clean, minimal design)
 svg_icons = {
@@ -890,6 +979,15 @@ st.sidebar.markdown("""
     background-size: contain;
 }
 
+/* Preprocessing Data - extra padding for longer text */
+[data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label:nth-child(3) {
+    padding-top: 0.65rem !important;
+    padding-bottom: 0.65rem !important;
+    height: auto !important;
+    min-height: 52px !important;
+    max-height: 52px !important;
+}
+
 /* Preprocessing Data icon */
 [data-testid="stSidebar"] .stRadio > div[role="radiogroup"] > label:nth-child(3)::after {
     content: "";
@@ -968,9 +1066,16 @@ st.sidebar.markdown("""
 # Create radio with icons
 page = st.sidebar.radio("", menu_items, label_visibility="collapsed")
 
-# ===========================================
-# PAGE: DASHBOARD
-# ===========================================
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║                                                                           ║
+# ║                         PAGE 1: DASHBOARD                                 ║
+# ║                                                                           ║
+# ║  Halaman utama yang menampilkan:                                          ║
+# ║  - Latar belakang & tujuan analisis                                       ║
+# ║  - Tujuan dashboard                                                       ║
+# ║  - Ringkasan dataset (jika sudah dimuat)                                  ║
+# ║                                                                           ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
 if page == "Dashboard":
     # Section 1: Latar Belakang & Tujuan Analisis
     st.markdown("""<div class="card"><div class="dashboard-section"><div class="section-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg></div><h3 class="section-title">Latar Belakang & Tujuan Analisis</h3></div><div class="dashboard-content"><p>Kasus pembunuhan merupakan masalah sosial yang serius karena tidak hanya menimbulkan penderitaan bagi korban dan keluarga, tetapi juga membuat masyarakat merasa tidak aman. Selama ini, upaya pencegahan kejahatan sering kali bersifat umum dan kurang tepat sasaran karena tidak mempertimbangkan karakteristik korban. Padahal, tingkat risiko terhadap pembunuhan bisa berbeda-beda tergantung usia, jenis kelamin, dan ras seseorang.</p><p>Oleh karena itu, penting untuk melakukan analisis yang berfokus pada korban agar bisa diketahui kelompok mana yang paling rentan menjadi sasaran kejahatan. Dengan memahami pola-pola tersebut, hasil analisis dapat menjadi dasar bagi pemerintah dan aparat hukum untuk merancang kebijakan pencegahan yang lebih efektif dan tepat sasaran, seperti:</p><div class="bullet-list"><div class="bullet-item"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg><span><strong>Meningkatkan patroli dan pengawasan</strong> di wilayah yang rawan dengan tingkat pembunuhan tinggi</span></div><div class="bullet-item"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg><span><strong>Menyusun program perlindungan khusus</strong> untuk kelompok rentan, seperti perempuan yang bekerja malam hari atau lansia yang tinggal sendiri</span></div><div class="bullet-item"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg><span><strong>Mengembangkan strategi edukasi</strong> masyarakat yang disesuaikan dengan karakteristik demografis tertentu</span></div><div class="bullet-item"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg><span><strong>Mengalokasikan sumber daya</strong> lebih efisien berdasarkan pola risiko yang teridentifikasi</span></div></div></div></div>""", unsafe_allow_html=True)
@@ -1007,9 +1112,14 @@ if page == "Dashboard":
     
     st.markdown("</div>", unsafe_allow_html=True)
 
-# -----------------------------
-# Page: Visualisasi & Hasil
-# -----------------------------
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║                                                                           ║
+# ║                    PAGE (LEGACY): VISUALISASI & HASIL                     ║
+# ║                                                                           ║
+# ║  Halaman lama yang menggabungkan visualisasi dan hasil.                   ║
+# ║  (Tidak digunakan dalam menu saat ini)                                    ║
+# ║                                                                           ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
 elif page == "Visualisasi & Hasil":
     st.markdown("<div class='card'>", unsafe_allow_html=True)
     st.subheader("Visualisasi hasil clustering")
@@ -1120,9 +1230,15 @@ elif page == "Visualisasi & Hasil":
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ===========================================
-# PAGE: INPUT DATASET
-# ===========================================
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║                                                                           ║
+# ║                       PAGE 2: INPUT DATASET                               ║
+# ║                                                                           ║
+# ║  Halaman untuk memuat dataset:                                            ║
+# ║  - Upload file CSV                                                        ║
+# ║  - Atau memuat dari path lokal default                                    ║
+# ║                                                                           ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
 elif page == "Input Dataset":
     # Section header
     st.markdown("""<div class="card"><div class="dashboard-section"><div class="section-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg></div><h3 class="section-title">Input Dataset</h3></div><div class="dashboard-content"><p>Anda bisa meng-upload file CSV atau membiarkan aplikasi membaca CSV lokal.</p></div>""", unsafe_allow_html=True)
@@ -1149,9 +1265,17 @@ elif page == "Input Dataset":
     
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ===========================================
-# PAGE: PREPROCESSING DATA
-# ===========================================
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║                                                                           ║
+# ║                     PAGE 3: PREPROCESSING DATA                            ║
+# ║                                                                           ║
+# ║  Halaman untuk pra-proses data:                                           ║
+# ║  - Deteksi masalah kualitas data                                          ║
+# ║  - Rekomendasi cleaning                                                   ║
+# ║  - Opsi cleaning manual (hapus duplikat, isi nilai kosong)                ║
+# ║  - Pilih fitur untuk clustering                                           ║
+# ║                                                                           ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
 elif page == "Preprocessing Data":
     # Section header
     st.markdown("""<div class="card"><div class="dashboard-section"><div class="section-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></div><h3 class="section-title">Pra-proses Data</h3></div>""", unsafe_allow_html=True)
@@ -1225,9 +1349,17 @@ elif page == "Preprocessing Data":
     
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ===========================================
-# PAGE: ANALISIS DATA
-# ===========================================
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║                                                                           ║
+# ║                       PAGE 4: ANALISIS DATA                               ║
+# ║                                                                           ║
+# ║  Halaman untuk analisis pemilihan K optimal:                              ║
+# ║  - Metode Elbow (Inertia)                                                 ║
+# ║  - Metode Silhouette Score                                                ║
+# ║  - Saran K terbaik secara otomatis                                        ║
+# ║  - Opsi pilih K manual                                                    ║
+# ║                                                                           ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
 elif page == "Analisis Data":
     # Section header
     st.markdown("""<div class="card"><div class="dashboard-section"><div class="section-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg></div><h3 class="section-title">Analisis: Elbow & Silhouette untuk Memilih K</h3></div>""", unsafe_allow_html=True)
@@ -1295,9 +1427,18 @@ elif page == "Analisis Data":
     
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ===========================================
-# PAGE: VISUALISASI
-# ===========================================
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║                                                                           ║
+# ║                        PAGE 5: VISUALISASI                                ║
+# ║                                                                           ║
+# ║  Halaman untuk menjalankan clustering dan visualisasi:                    ║
+# ║  - Pilih metode reduksi dimensi (PCA, t-SNE, UMAP)                        ║
+# ║  - Jalankan K-Means clustering                                            ║
+# ║  - Visualisasi klaster 2D                                                 ║
+# ║  - Peta geografis (jika ada koordinat lat/lon)                            ║
+# ║  - Download hasil clustering                                              ║
+# ║                                                                           ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
 elif page == "Visualisasi":
     # Section header
     st.markdown("""<div class="card"><div class="dashboard-section"><div class="section-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg></div><h3 class="section-title">Visualisasi Hasil Clustering</h3></div>""", unsafe_allow_html=True)
@@ -1403,9 +1544,17 @@ elif page == "Visualisasi":
     
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ===========================================
-# PAGE: HASIL
-# ===========================================
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║                                                                           ║
+# ║                          PAGE 6: HASIL                                    ║
+# ║                                                                           ║
+# ║  Halaman untuk menampilkan hasil analisis:                                ║
+# ║  - Statistik per klaster                                                  ║
+# ║  - Insights & kesimpulan otomatis                                         ║
+# ║  - Rekomendasi kebijakan                                                  ║
+# ║  - Metrik kualitas clustering (Silhouette Score)                          ║
+# ║                                                                           ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
 elif page == "Hasil":
     # Section header
     st.markdown("""<div class="card"><div class="dashboard-section"><div class="section-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg></div><h3 class="section-title">Kesimpulan & Hasil Analisis</h3></div>""", unsafe_allow_html=True)
@@ -1520,10 +1669,15 @@ elif page == "Hasil":
             st.markdown("""<div class="bullet-item"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg><span>Clustering kualitas sedang (0.3 < silhouette ≤ 0.5)</span></div>""", unsafe_allow_html=True)
         else:
             st.markdown("""<div class="bullet-item" style="background: rgba(245, 158, 11, 0.15); border-left-color: #f59e0b;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg><span style="color: #fde68a;">Clustering kualitas kurang (silhouette ≤ 0.3)</span></div>""", unsafe_allow_html=True)
-    # ===========================================
-# ===========================================
-# PAGE: TIM KAMI (VERSI FINAL: FULL FRAME / WIDTH 100%)
-# ===========================================
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║                                                                           ║
+# ║                          PAGE 7: TEAM                                     ║
+# ║                                                                           ║
+# ║  Halaman profil tim pengembang:                                           ║
+# ║  - Foto anggota tim                                                       ║
+# ║  - Nama, NIM, dan role                                                    ║
+# ║                                                                           ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
 elif page == "Team":
     import base64 
 
