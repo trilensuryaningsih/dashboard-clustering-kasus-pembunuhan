@@ -52,13 +52,10 @@ import plotly.express as px
 # ║                    SECTION 2: CONFIG & CONSTANTS                          ║
 # ║                                                                           ║
 # ║  Konfigurasi aplikasi:                                                    ║
-# ║  - DEFAULT_CSV: Path default untuk file dataset                          ║
-# ║  - ACCENT: Warna aksen tema (tidak digunakan aktif)                       ║
 # ║  - Page config: Judul dan layout dashboard                                ║
 # ║                                                                           ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
-DEFAULT_CSV = r"C:\praktikum\homicide-data.csv"
-ACCENT = "#6C5CE7"
+
 
 st.set_page_config(page_title="Clustering Kasus Pembunuhan", layout="wide")
 
@@ -683,12 +680,7 @@ def robust_read_csv(path_or_buffer, try_encodings=None):
         txt = data.decode("utf-8", errors="replace")
         return pd.read_csv(io.StringIO(txt))
 
-@st.cache_data
-def load_csv(path):
-    try:
-        return robust_read_csv(path)
-    except Exception:
-        return pd.DataFrame()
+
 
 def detect_data_quality_issues(df):
     issues = {}
@@ -700,38 +692,57 @@ def detect_data_quality_issues(df):
 
 def recommend_cleaning(df):
     recs = []
-    for col in df.columns:
-        if col in ["victim_age"]:
-            try:
-                numeric = pd.to_numeric(df[col].replace({"kosong": np.nan, "": np.nan}), errors="coerce")
-                if numeric.isna().sum() > 0:
-                    recs.append(f"📌 **{col}**: {numeric.isna().sum()} nilai kosong. Rekomendasi: isi dengan median atau hapus baris.")
-            except:
-                pass
+    issues = detect_data_quality_issues(df)
+    
+    for col, issue in issues.items():
+        if issue['type'] == 'missing':
+            # Check if column is numeric
+            if col in ["victim_age"]:
+                recs.append(f"📌 **{col}**: {issue['count']} nilai kosong. Rekomendasi: isi dengan median atau hapus baris.")
+            elif df[col].dtype.kind in "biufc":  # numeric columns
+                recs.append(f"📌 **{col}**: {issue['count']} nilai kosong. Rekomendasi: isi dengan median/mean atau hapus baris.")
+            else:  # categorical columns
+                recs.append(f"📌 **{col}**: {issue['count']} nilai kosong. Rekomendasi: isi dengan nilai 'Unknown' atau hapus baris.")
+    
     return recs
 
 @st.cache_data
-def preprocess_with_options(df_in, features, fill_age_with_method="median", remove_duplicates=False, remove_missing=False):
+def preprocess_with_options(df_in, features, fill_numeric_method="median", fill_categorical_method="Unknown", remove_duplicates=False, remove_missing=False):
     dfp = df_in.copy()
     
     # remove duplicates
     if remove_duplicates:
         dfp = dfp.drop_duplicates()
     
-    # victim_age normalization
-    if "victim_age" in dfp.columns:
-        dfp["victim_age"] = pd.to_numeric(dfp["victim_age"].replace({"kosong": np.nan, "": np.nan}), errors="coerce")
-        if fill_age_with_method == "median":
-            dfp["victim_age"] = dfp["victim_age"].fillna(dfp["victim_age"].median())
-        elif fill_age_with_method == "mean":
-            dfp["victim_age"] = dfp["victim_age"].fillna(dfp["victim_age"].mean())
-        else:
-            dfp["victim_age"] = dfp["victim_age"].fillna(0)
+    # Handle all numeric columns dynamically
+    for col in dfp.columns:
+        if dfp[col].dtype.kind in "biufc":  # numeric columns
+            # Clean numeric data
+            dfp[col] = pd.to_numeric(dfp[col].replace({"kosong": np.nan, "": np.nan}), errors="coerce")
+            
+            # Fill missing values based on method
+            if dfp[col].isna().sum() > 0:
+                if fill_numeric_method == "median":
+                    dfp[col] = dfp[col].fillna(dfp[col].median())
+                elif fill_numeric_method == "mean":
+                    dfp[col] = dfp[col].fillna(dfp[col].mean())
+                elif fill_numeric_method == "0":
+                    dfp[col] = dfp[col].fillna(0)
     
-    # fill categories
-    for c in ["victim_race", "victim_sex", "state", "disposition"]:
-        if c in dfp.columns:
-            dfp[c] = dfp[c].fillna("Unknown").astype(str)
+    # Handle all categorical/string columns dynamically
+    for col in dfp.columns:
+        if dfp[col].dtype == 'object' or dfp[col].dtype.name == 'category':
+            if dfp[col].isna().sum() > 0:
+                if fill_categorical_method == "Unknown":
+                    dfp[col] = dfp[col].fillna("Unknown").astype(str)
+                elif fill_categorical_method == "mode":
+                    mode_val = dfp[col].mode()
+                    if len(mode_val) > 0:
+                        dfp[col] = dfp[col].fillna(mode_val[0]).astype(str)
+                    else:
+                        dfp[col] = dfp[col].fillna("Unknown").astype(str)
+                else:
+                    dfp[col] = dfp[col].astype(str)
     
     # remove rows with missing in selected features
     if remove_missing:
@@ -1234,16 +1245,14 @@ elif page == "Visualisasi & Hasil":
 # ║                                                                           ║
 # ║                       PAGE 2: INPUT DATASET                               ║
 # ║                                                                           ║
-# ║  Halaman untuk memuat dataset:                                            ║
-# ║  - Upload file CSV                                                        ║
-# ║  - Atau memuat dari path lokal default                                    ║
+# ║  Halaman untuk upload dataset CSV                                         ║
 # ║                                                                           ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 elif page == "Input Dataset":
     # Section header
-    st.markdown("""<div class="card"><div class="dashboard-section"><div class="section-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg></div><h3 class="section-title">Input Dataset</h3></div><div class="dashboard-content"><p>Anda bisa meng-upload file CSV atau membiarkan aplikasi membaca CSV lokal.</p></div>""", unsafe_allow_html=True)
+    st.markdown("""<div class="card"><div class="dashboard-section"><div class="section-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg></div><h3 class="section-title">Input Dataset</h3></div><div class="dashboard-content"><p>Upload file CSV untuk memulai analisis clustering.</p></div>""", unsafe_allow_html=True)
     
-    uploaded = st.file_uploader("Upload CSV (opsional)", type=["csv"])
+    uploaded = st.file_uploader("Upload file CSV", type=["csv"])
     if uploaded is not None:
         df0 = robust_read_csv(uploaded)
         st.session_state.df_raw = df0
@@ -1251,17 +1260,7 @@ elif page == "Input Dataset":
         st.markdown(f"""<div class="bullet-item"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg><span><strong>Informasi</strong>: {len(df0)} baris, {len(df0.columns)} kolom</span></div>""", unsafe_allow_html=True)
         st.dataframe(df0.head(10), use_container_width=True)
     else:
-        st.markdown("""<div class="bullet-item"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg><span>Tidak ada file diupload — mencoba baca CSV lokal:</span></div>""", unsafe_allow_html=True)
-        st.code(DEFAULT_CSV)
-        if st.button("Muat CSV lokal"):
-            df0 = load_csv(DEFAULT_CSV)
-            if df0.empty:
-                st.markdown("""<div class="bullet-item" style="background: rgba(239, 68, 68, 0.15); border-left-color: #ef4444;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg><span style="color: #fca5a5;">Gagal membaca CSV lokal. Pastikan path benar atau upload file.</span></div>""", unsafe_allow_html=True)
-            else:
-                st.session_state.df_raw = df0
-                st.markdown("""<div class="bullet-item" style="background: rgba(16, 185, 129, 0.15); border-left-color: #10b981;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg><span style="color: #a7f3d0;">CSV lokal berhasil dimuat.</span></div>""", unsafe_allow_html=True)
-                st.markdown(f"""<div class="bullet-item"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg><span><strong>Informasi</strong>: {len(df0)} baris, {len(df0.columns)} kolom</span></div>""", unsafe_allow_html=True)
-                st.dataframe(df0.head(10), use_container_width=True)
+        st.markdown("""<div class="bullet-item" style="background: rgba(59, 130, 246, 0.1); border-left-color: #3b82f6;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg><span style="color: #bfdbfe;">Silakan upload file CSV untuk memulai analisis.</span></div>""", unsafe_allow_html=True)
     
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1312,13 +1311,60 @@ elif page == "Preprocessing Data":
     
     # Step 3: Opsi Cleaning Manual
     st.markdown("""<div class="dashboard-section" style="margin-top: 20px;"><div class="section-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></div><h3 class="section-title" style="font-size: 1.1rem;">3. Opsi Cleaning Manual</h3></div>""", unsafe_allow_html=True)
-    col_opt1, col_opt2 = st.columns(2)
-    with col_opt1:
-        remove_dup = st.checkbox("Hapus duplikat", value=False)
-    with col_opt2:
-        remove_miss = st.checkbox("Hapus baris dengan nilai kosong di fitur terpilih", value=False)
     
-    fill_choice = st.selectbox("Isi nilai usia kosong dengan:", ["median", "mean", "0"], index=0)
+    # Detect which types of columns have issues
+    numeric_issues = []
+    categorical_issues = []
+    
+    for col, issue in issues.items():
+        if issue['type'] == 'missing':
+            if df[col].dtype.kind in "biufc":  # numeric
+                numeric_issues.append(col)
+            else:  # categorical/string
+                categorical_issues.append(col)
+    
+    # Three main cleaning options
+    st.markdown("""<div class="bullet-item" style="background: rgba(59, 130, 246, 0.08); border-left-color: #3b82f6;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg><span style="color: #bfdbfe;">Pilih metode cleaning yang ingin diterapkan:</span></div>""", unsafe_allow_html=True)
+    
+    # Checkbox for duplicate removal (independent)
+    remove_dup = st.checkbox("Hapus duplikat", value=False, help="Menghapus baris yang identik/duplikat")
+    
+    # Radio buttons for null value handling strategy (mutually exclusive)
+    st.markdown("""<div style="margin-top: 12px; margin-bottom: 8px; color: #e5e5e5; font-weight: 500;">Strategi penanganan nilai kosong:</div>""", unsafe_allow_html=True)
+    null_strategy = st.radio(
+        "Pilih strategi:",
+        options=["Ganti nilai kosong", "Hapus nilai null"],
+        index=0,
+        help="Pilih salah satu: mengganti nilai kosong dengan strategi tertentu ATAU menghapus baris dengan nilai kosong",
+        label_visibility="collapsed"
+    )
+    
+    # Set flags based on radio selection
+    remove_null = (null_strategy == "Hapus nilai null")
+    replace_values = (null_strategy == "Ganti nilai kosong")
+    
+    # Show info when remove_null is selected
+    if remove_null:
+        st.markdown("""<div class="bullet-item" style="background: rgba(245, 158, 11, 0.12); border-left-color: #f59e0b;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg><span style="color: #fde68a;">⚠️ Mode "Hapus nilai null" - semua baris dengan nilai kosong akan dihapus</span></div>""", unsafe_allow_html=True)
+    
+    # Show replacement options only if replace_values is selected
+    fill_numeric_choice = "median"  # default
+    fill_categorical_choice = "Unknown"  # default
+    
+    if replace_values:
+        # Show numeric options only if there are numeric issues
+        if numeric_issues:
+            st.markdown(f"""<div class="bullet-item" style="background: rgba(59, 130, 246, 0.1); border-left-color: #3b82f6;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg><span style="color: #bfdbfe;">Terdeteksi kolom <strong>numerik</strong> dengan nilai kosong: {', '.join(numeric_issues)}</span></div>""", unsafe_allow_html=True)
+            fill_numeric_choice = st.selectbox("🔢 Isi nilai numerik kosong dengan:", ["median", "mean", "0"], index=0, help="Pilihan ini akan diterapkan ke semua kolom numerik yang memiliki nilai kosong")
+        
+        # Show categorical options only if there are categorical issues
+        if categorical_issues:
+            st.markdown(f"""<div class="bullet-item" style="background: rgba(59, 130, 246, 0.1); border-left-color: #3b82f6;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg><span style="color: #bfdbfe;">Terdeteksi kolom <strong>kategorikal/string</strong> dengan nilai kosong: {', '.join(categorical_issues)}</span></div>""", unsafe_allow_html=True)
+            fill_categorical_choice = st.selectbox("📝 Isi nilai kategorikal kosong dengan:", ["Unknown", "mode"], index=0, help="Pilihan ini akan diterapkan ke semua kolom kategorikal yang memiliki nilai kosong")
+        
+        # If no issues detected, show info
+        if not numeric_issues and not categorical_issues:
+            st.markdown("""<div class="bullet-item" style="background: rgba(16, 185, 129, 0.1); border-left-color: #10b981;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg><span style="color: #a7f3d0;">Tidak ada nilai kosong terdeteksi pada data.</span></div>""", unsafe_allow_html=True)
     
     # Step 4: Pilih Fitur untuk Clustering
     st.markdown("""<div class="dashboard-section" style="margin-top: 20px;"><div class="section-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg></div><h3 class="section-title" style="font-size: 1.1rem;">4. Pilih Fitur untuk Clustering</h3></div>""", unsafe_allow_html=True)
@@ -1334,7 +1380,7 @@ elif page == "Preprocessing Data":
             st.markdown("""<div class="bullet-item" style="background: rgba(239, 68, 68, 0.15); border-left-color: #ef4444;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg><span style="color: #fca5a5;">Pilih minimal satu fitur.</span></div>""", unsafe_allow_html=True)
         else:
             with st.spinner("Menghitung preview..."):
-                dfp, Xsc, feat_cols = preprocess_with_options(df, selected, fill_choice, remove_dup, remove_miss)
+                dfp, Xsc, feat_cols = preprocess_with_options(df, selected, fill_numeric_choice, fill_categorical_choice, remove_dup, remove_null)
                 if Xsc is None:
                     st.markdown("""<div class="bullet-item" style="background: rgba(239, 68, 68, 0.15); border-left-color: #ef4444;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg><span style="color: #fca5a5;">Tidak ada fitur yang dapat diproses. Periksa pilihan fitur.</span></div>""", unsafe_allow_html=True)
                 else:
@@ -1576,8 +1622,10 @@ elif page == "Hasil":
         sub = dfp[dfp["cluster"] == cl]
         row = {"Klaster": int(cl), "Jumlah": len(sub), "Persentase": f"{100*len(sub)/len(dfp):.1f}%"}
         if "victim_age" in sub.columns:
-            row["Rata-rata Usia"] = round(sub["victim_age"].dropna().mean(), 1)
-            row["Median Usia"] = float(sub["victim_age"].median())
+            # Convert to numeric, handling any non-numeric values
+            age_numeric = pd.to_numeric(sub["victim_age"], errors='coerce')
+            row["Rata-rata Usia"] = round(age_numeric.dropna().mean(), 1) if not age_numeric.dropna().empty else "—"
+            row["Median Usia"] = float(age_numeric.median()) if not age_numeric.dropna().empty else "—"
         for cat in ["victim_race", "victim_sex", "state", "disposition"]:
             if cat in sub.columns:
                 top = sub[cat].mode()
@@ -1599,7 +1647,7 @@ elif page == "Hasil":
         
         insights = []
         if "victim_age" in sub.columns:
-            avg_age = sub["victim_age"].dropna().mean()
+            avg_age = pd.to_numeric(sub["victim_age"], errors='coerce').dropna().mean()
             if avg_age < 25:
                 insights.append(("users", "Didominasi korban muda (< 25 tahun) — tinggi risiko di kalangan anak-anak & remaja"))
             elif avg_age > 60:
