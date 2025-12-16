@@ -34,7 +34,7 @@ import io
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-from sklearn.metrics import silhouette_score
+from sklearn.metrics import silhouette_score, silhouette_samples
 from sklearn.manifold import TSNE
 
 # optional UMAP
@@ -479,6 +479,35 @@ st.markdown(
         color: #ffffff;
     }
     
+    /* Download sample button styling */
+    button[aria-label="Download contoh dataset (CSV)"] {
+        padding: 12px 18px;
+        font-size: 1rem;
+        border-radius: 8px;
+        border: 1px solid rgba(239, 68, 68, 0.25);
+        background-color: rgba(17, 24, 39, 0.85);
+        color: #ffffff;
+    }
+    button[aria-label="Download contoh dataset (CSV)"]:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
+    }
+    /* Large HTML download button (used when embedding inside card) */
+    .download-btn-large {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 22px;
+        font-size: 1.05rem;
+        border-radius: 10px;
+        border: 1px solid rgba(239, 68, 68, 0.25);
+        background: linear-gradient(135deg, rgba(20,20,20,0.95), rgba(30,30,30,0.9));
+        color: #fff;
+        text-decoration: none;
+    }
+    .download-btn-large svg { stroke: #ef4444; }
+    .download-btn-large:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.5); }
+
     /* Metric Cards */
     .metric-card {
         background: linear-gradient(135deg, rgba(25, 25, 25, 0.95) 0%, rgba(35, 35, 35, 0.9) 100%);
@@ -1217,6 +1246,74 @@ elif page == "Visualisasi & Hasil":
             stats.append(row)
         st.dataframe(pd.DataFrame(stats).set_index("cluster"))
 
+        # Additional visualizations: silhouette bars, donut charts, heatmap
+        import traceback
+        try:
+            from sklearn.metrics import silhouette_samples
+            import plotly.graph_objects as go
+
+            # Debug/status panel to help explain if visualizations don't render
+            st.markdown("""<div class='dashboard-section' style='margin-top: 12px;'><div class='section-icon'><svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 2v4'></path><path d='M12 12v10'></path></svg></div><h3 class='section-title' style='font-size: 1.0rem;'>Debug: status pasca-clustering</h3></div>""", unsafe_allow_html=True)
+            st.write(f"Detected clusters: {sorted(dfp['cluster'].unique())}")
+            st.write(f"n_clusters (unique labels): {len(set(labels))}")
+            st.write(f"Global silhouette (session): {st.session_state.get('silhouette_score_val')}")
+            st.write(f"Xscaled shape: {getattr(Xscaled, 'shape', None)}")
+            feat_cols = st.session_state.get('feature_cols', []) or []
+            st.write(f"Feature cols: {feat_cols}")
+
+            if len(set(labels)) > 1:
+                sil_samples = silhouette_samples(Xscaled, labels)
+                if len(sil_samples) != len(dfp):
+                    st.warning(f"Warning: silhouette_samples length {len(sil_samples)} != number of rows {len(dfp)}")
+                dfp = dfp.assign(silhouette=sil_samples)
+
+                # Silhouette: add section header with icon and horizontal bar plot (stacked by cluster)
+                st.markdown("""<div class='dashboard-section' style='margin-top: 12px;'><div class='section-icon'><svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 12h18'></path><path d='M12 3v18'></path></svg></div><h3 class='section-title' style='font-size: 1.1rem;'>4. Silhouette per klaster</h3></div>""", unsafe_allow_html=True)
+                sil_df = dfp[["silhouette", "cluster"]].copy()
+                sil_df["cluster"] = sil_df["cluster"].astype(int)
+                sil_df = sil_df.sort_values(["cluster", "silhouette"], ascending=[True, False])
+                traces = []
+                y_base = 0
+                cluster_order = sorted(sil_df["cluster"].unique())
+                for cl in cluster_order:
+                    sub = sil_df[sil_df["cluster"] == cl]
+                    n = len(sub)
+                    ys = list(range(y_base, y_base + n))
+                    traces.append(go.Bar(x=sub["silhouette"].values, y=ys, orientation="h", name=f"Cluster {cl}", marker=dict(opacity=0.9)))
+                    y_base += n
+                fig_sil = go.Figure(data=traces)
+                avg_sil = float(np.mean(sil_samples))
+                fig_sil.update_layout(barmode='stack', height=420, title='4. Silhouette per klaster', xaxis_title='Silhouette value', yaxis=dict(showticklabels=False))
+                fig_sil.add_vline(x=avg_sil, line=dict(color='black', dash='dash'), annotation_text=f'Global mean: {avg_sil:.3f}', annotation_position='top left')
+                st.plotly_chart(fig_sil, use_container_width=True)
+
+                # Heatmap: mean of numeric features per cluster (include coordinates and other numeric features)
+                feat_cols = st.session_state.get('feature_cols', []) or []
+                # If user provided feature_cols prefer those, otherwise infer numeric columns from the dataframe
+                if feat_cols:
+                    numeric_feats = [c for c in feat_cols if c in dfp.columns and pd.api.types.is_numeric_dtype(dfp[c])]
+                else:
+                    numeric_feats = [c for c in dfp.select_dtypes(include='number').columns if c in dfp.columns]
+                # Fallback to victim_age when nothing numeric available
+                if len(numeric_feats) == 0 and 'victim_age' in dfp.columns:
+                    numeric_feats = ['victim_age']
+                st.write(f"Numeric features used for heatmap: {numeric_feats}")
+
+                if len(numeric_feats) > 0:
+                    cluster_means = dfp.groupby('cluster')[numeric_feats].mean()
+                    st.markdown("""<div class='dashboard-section' style='margin-top: 12px;'><div class='section-icon'><svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='3' width='18' height='18' rx='2'></rect></svg></div><h3 class='section-title' style='font-size: 1.1rem;'>5. Heatmap: Rata-rata fitur per klaster</h3></div>""", unsafe_allow_html=True)
+                    heat_df = cluster_means.copy()
+                    heat_df.index = heat_df.index.astype(str)
+                    fig_heat = px.imshow(heat_df, labels=dict(x='Feature', y='Cluster', color='Mean'), x=heat_df.columns, y=heat_df.index, color_continuous_scale='RdBu')
+                    fig_heat.update_layout(height=360, title='5. Heatmap: Rata-rata fitur per klaster')
+                    st.plotly_chart(fig_heat, use_container_width=True)
+                else:
+                    st.info('Tidak ada fitur numerik terpilih untuk membuat heatmap.')
+            else:
+                st.info("Tidak cukup klaster untuk membuat plot silhouette (butuh >1 klaster).")
+        except Exception as e:
+            st.warning(f"Gagal membuat visualisasi tambahan: {e}")
+
         # map if coordinates exist
         lat_col = "lat" if "lat" in dfp.columns else ("latitude" if "latitude" in dfp.columns else None)
         lon_col = "lon" if "lon" in dfp.columns else ("longitude" if "longitude" in dfp.columns else None)
@@ -1225,17 +1322,48 @@ elif page == "Visualisasi & Hasil":
             df_map = dfp.dropna(subset=[lat_col, lon_col])
             fig_map = px.scatter_mapbox(df_map, lat=lat_col, lon=lon_col, color=df_map["cluster"].astype(str),
                                         hover_data=hover_cols, zoom=10, height=600)
+            # Add cluster-level centroids so hovering a cluster shows aggregated stats
+            try:
+                import plotly.graph_objects as go
+                grp = df_map.groupby("cluster")
+                clusters = grp.size().rename("count").reset_index()
+                clusters["mean_lat"] = grp[lat_col].mean().values
+                clusters["mean_lon"] = grp[lon_col].mean().values
+                # mean age if available
+                if "victim_age" in df_map.columns:
+                    clusters["mean_age"] = grp["victim_age"].apply(lambda s: round(pd.to_numeric(s, errors="coerce").dropna().mean(), 2))
+                else:
+                    clusters["mean_age"] = ""
+                # top categorical values
+                for cat in ["victim_race", "victim_sex", "state", "disposition"]:
+                    if cat in df_map.columns:
+                        clusters[f"top_{cat}"] = grp[cat].agg(lambda s: s.mode().iloc[0] if not s.mode().empty else "")
+                    else:
+                        clusters[f"top_{cat}"] = ""
+                customdata = clusters[["cluster","count","mean_age","top_victim_race","top_victim_sex","top_state","top_disposition"]].values
+                hovertemplate = ("Cluster: %{customdata[0]}<br>Count: %{customdata[1]}<br>Mean age: %{customdata[2]}<br>"
+                                 "Top race: %{customdata[3]}<br>Top sex: %{customdata[4]}<br>Top state: %{customdata[5]}<br>"
+                                 "Top disposition: %{customdata[6]}<extra></extra>")
+                fig_map.add_trace(go.Scattermapbox(
+                    lat=clusters["mean_lat"],
+                    lon=clusters["mean_lon"],
+                    mode="markers+text",
+                    marker=dict(size=18, color="#ffffff", opacity=0.9, symbol="circle"),
+                    text=clusters["cluster"].astype(str),
+                    textposition="middle center",
+                    hovertemplate=hovertemplate,
+                    customdata=customdata,
+                    showlegend=False
+                ))
+            except Exception:
+                pass
+
             fig_map.update_layout(mapbox_style="open-street-map", margin={"r":0,"t":0,"l":0,"b":0})
             st.plotly_chart(fig_map, use_container_width=True)
         else:
             st.info("Kolom lat/lon tidak ada atau kosong — peta tidak ditampilkan.")
 
-        # sample & download
-        st.subheader("Contoh & Unduh Hasil")
-        sel = st.selectbox("Pilih klaster untuk contoh baris", options=sorted(dfp["cluster"].unique()))
-        st.dataframe(dfp[dfp["cluster"] == sel].head(25))
-        csv = dfp.to_csv(index=False).encode("utf-8")
-        st.download_button("Download dataset berlabel (CSV)", data=csv, file_name="homicide_with_clusters.csv", mime="text/csv")
+        # sample & download removed per user request
     else:
         st.info("Klik 'Run Clustering & Visualize' untuk menjalankan KMeans dan melihat hasil.")
 
@@ -1251,8 +1379,33 @@ elif page == "Visualisasi & Hasil":
 elif page == "Input Dataset":
     # Section header
     st.markdown("""<div class="card"><div class="dashboard-section"><div class="section-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg></div><h3 class="section-title">Input Dataset</h3></div><div class="dashboard-content"><p>Upload file CSV untuk memulai analisis clustering.</p></div>""", unsafe_allow_html=True)
-    
+
+    # Contoh dataset (tampil di atas uploader) — styled like a card with SVG icon and centered button
+    import os
+    sample_paths = [
+        os.path.join("data", "homicide-data.csv"),
+        "homicide-data.csv",
+        os.path.join(os.path.expanduser("~"), "Downloads", "homicide-data.csv"),
+        os.path.join(os.path.expanduser("~"), "Downloads", "archive (5)", "homicide-data.csv"),
+    ]
+    sample_file = next((p for p in sample_paths if os.path.exists(p)), None)
+    if sample_file:
+        try:
+            import base64
+            with open(sample_file, "rb") as _f:
+                sample_bytes = _f.read()
+            b64 = base64.b64encode(sample_bytes).decode("ascii")
+
+            download_html = f"""<div class="card" style="margin-top:12px;"><div class="dashboard-section"><div class="section-icon"><svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'></path><path d='M12 3v12'></path><path d='M8 7l4 4 4-4'></path></svg></div><h3 class='section-title'>Contoh dataset</h3></div><div class='dashboard-content' style='display:flex;align-items:center;justify-content:space-between;gap:12px;'><div><p style="margin:0">Unduh dataset contoh untuk mencoba dashboard.</p></div><div><a class='download-btn-large' href='data:text/csv;base64,{b64}' download='homicide-data.csv' title='Download contoh dataset (CSV)'><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M12 3v12"></path><path d="M8 7l4 4 4-4"></path></svg><span>Download contoh dataset (CSV)</span></a></div></div></div>"""
+
+            st.markdown(download_html, unsafe_allow_html=True)
+        except Exception as e:
+            st.warning(f"Gagal membuka contoh dataset: {e}")
+    else:
+        st.markdown("""<div class="card" style="margin-top:12px;"><div class="dashboard-section"><div class="section-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M12 3v12"></path><path d="M8 7l4 4 4-4"></path></svg></div><h3 class="section-title">Contoh dataset</h3></div><div class="dashboard-content"><p style="margin:0">Contoh dataset tidak tersedia — tempatkan <code>homicide-data.csv</code> di folder <code>data/</code> atau folder kerja untuk menampilkannya.</p></div></div>""", unsafe_allow_html=True)
+
     uploaded = st.file_uploader("Upload file CSV", type=["csv"])
+
     if uploaded is not None:
         df0 = robust_read_csv(uploaded)
         st.session_state.df_raw = df0
@@ -1571,19 +1724,103 @@ elif page == "Visualisasi":
             df_map = dfp.dropna(subset=[lat_col, lon_col])
             fig_map = px.scatter_mapbox(df_map, lat=lat_col, lon=lon_col, color=df_map["cluster"].astype(str),
                                        hover_data=hover_cols, zoom=10, height=600, title="Distribusi Klaster per Lokasi")
+            # add centroid markers with cluster stats on hover
+            try:
+                import plotly.graph_objects as go
+                grp = df_map.groupby("cluster")
+                clusters = grp.size().rename("count").reset_index()
+                clusters["mean_lat"] = grp[lat_col].mean().values
+                clusters["mean_lon"] = grp[lon_col].mean().values
+                if "victim_age" in df_map.columns:
+                    clusters["mean_age"] = grp["victim_age"].apply(lambda s: round(pd.to_numeric(s, errors="coerce").dropna().mean(), 2))
+                else:
+                    clusters["mean_age"] = ""
+                for cat in ["victim_race", "victim_sex", "state", "disposition"]:
+                    if cat in df_map.columns:
+                        clusters[f"top_{cat}"] = grp[cat].agg(lambda s: s.mode().iloc[0] if not s.mode().empty else "")
+                    else:
+                        clusters[f"top_{cat}"] = ""
+                customdata = clusters[["cluster","count","mean_age","top_victim_race","top_victim_sex","top_state","top_disposition"]].values
+                hovertemplate = ("Cluster: %{customdata[0]}<br>Count: %{customdata[1]}<br>Mean age: %{customdata[2]}<br>"
+                                 "Top race: %{customdata[3]}<br>Top sex: %{customdata[4]}<br>Top state: %{customdata[5]}<br>"
+                                 "Top disposition: %{customdata[6]}<extra></extra>")
+                fig_map.add_trace(go.Scattermapbox(
+                    lat=clusters["mean_lat"],
+                    lon=clusters["mean_lon"],
+                    mode="markers+text",
+                    marker=dict(size=18, color="#ffffff", opacity=0.9, symbol="circle"),
+                    text=clusters["cluster"].astype(str),
+                    textposition="middle center",
+                    hovertemplate=hovertemplate,
+                    customdata=customdata,
+                    showlegend=False
+                ))
+            except Exception:
+                pass
+
             fig_map.update_layout(mapbox_style="open-street-map", margin={"r": 0, "t": 0, "l": 0, "b": 0})
             st.plotly_chart(fig_map, use_container_width=True)
+
+            # --- Tambahan visualisasi setelah clustering: Silhouette, Donut per cluster, Heatmap ---
+            try:
+                import traceback
+                from sklearn.metrics import silhouette_samples
+                import plotly.graph_objects as go
+
+                if len(set(labels)) > 1:
+                    sil_samples = silhouette_samples(Xscaled, labels)
+                    if len(sil_samples) != len(dfp):
+                        st.warning(f"Peringatan: panjang silhouette ({len(sil_samples)}) berbeda dari jumlah baris ({len(dfp)})")
+                    dfp = dfp.assign(silhouette=sil_samples)
+
+                    # Silhouette: add section header with icon and horizontal bar plot per cluster
+                    st.markdown("""<div class='dashboard-section' style='margin-top: 12px;'><div class='section-icon'><svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 12h18'></path><path d='M12 3v18'></path></svg></div><h3 class='section-title' style='font-size: 1.1rem;'>4. Silhouette per klaster</h3></div>""", unsafe_allow_html=True)
+                    sil_df = dfp[["silhouette", "cluster"]].copy()
+                    sil_df["cluster"] = sil_df["cluster"].astype(int)
+                    sil_df = sil_df.sort_values(["cluster", "silhouette"], ascending=[True, False])
+                    colors = px.colors.qualitative.Plotly
+                    traces = []
+                    y_base = 0
+                    cluster_order = sorted(sil_df["cluster"].unique())
+                    for i, cl in enumerate(cluster_order):
+                        sub = sil_df[sil_df["cluster"] == cl]
+                        n = len(sub)
+                        ys = list(range(y_base, y_base + n))
+                        traces.append(go.Bar(x=sub["silhouette"].values, y=ys, orientation="h", name=f"Cluster {cl}", marker=dict(color=colors[i % len(colors)], opacity=0.9)))
+                        y_base += n
+                    fig_sil = go.Figure(data=traces)
+                    avg_sil = float(np.mean(sil_samples)) if len(sil_samples) > 0 else 0.0
+                    fig_sil.update_layout(barmode='stack', height=420, title='4. Silhouette per klaster', xaxis_title='Silhouette value', yaxis=dict(showticklabels=False))
+                    fig_sil.add_vline(x=avg_sil, line=dict(color='black', dash='dash'), annotation_text=f'Global mean: {avg_sil:.3f}', annotation_position='top left')
+                    st.plotly_chart(fig_sil, use_container_width=True)
+
+                    # Heatmap: mean of numeric features per cluster (include coordinates and other numeric features)
+                    feat_cols = st.session_state.get('feature_cols', []) or []
+                    if feat_cols:
+                        numeric_feats = [c for c in feat_cols if c in dfp.columns and pd.api.types.is_numeric_dtype(dfp[c])]
+                    else:
+                        numeric_feats = [c for c in dfp.select_dtypes(include='number').columns if c in dfp.columns]
+                    if len(numeric_feats) == 0 and 'victim_age' in dfp.columns:
+                        numeric_feats = ['victim_age']
+                    st.write(f"Numeric features used for heatmap: {numeric_feats}")
+
+                    if len(numeric_feats) > 0:
+                        cluster_means = dfp.groupby('cluster')[numeric_feats].mean()
+                        st.markdown("""<div class='dashboard-section' style='margin-top: 12px;'><div class='section-icon'><svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='3' width='18' height='18' rx='2'></rect></svg></div><h3 class='section-title' style='font-size: 1.1rem;'>5. Heatmap: Rata-rata fitur per klaster</h3></div>""", unsafe_allow_html=True)
+                        heat_df = cluster_means.copy()
+                        heat_df.index = heat_df.index.astype(str)
+                        fig_heat = px.imshow(heat_df, labels=dict(x='Feature', y='Cluster', color='Mean'), x=heat_df.columns, y=heat_df.index, color_continuous_scale='RdBu')
+                        fig_heat.update_layout(height=360, title='5. Heatmap: Rata-rata fitur per klaster')
+                        st.plotly_chart(fig_heat, use_container_width=True)
+                    else:
+                        st.info('Tidak ada fitur numerik terpilih untuk membuat heatmap.')
+            except Exception as e:
+                st.error(f"Gagal membuat visual tambahan: {e}")
+                st.text(traceback.format_exc())
         else:
             st.markdown("""<div class="bullet-item"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg><span>Kolom lat/lon tidak ada atau kosong — peta tidak ditampilkan.</span></div>""", unsafe_allow_html=True)
         
-        # Sample by cluster
-        st.markdown("""<div class="dashboard-section" style="margin-top: 20px;"><div class="section-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg></div><h3 class="section-title" style="font-size: 1.1rem;">4. Contoh Baris per Klaster</h3></div>""", unsafe_allow_html=True)
-        sel = st.selectbox("Pilih klaster untuk contoh baris", options=sorted(dfp["cluster"].unique()))
-        st.dataframe(dfp[dfp["cluster"] == sel].head(25), use_container_width=True)
-        
-        # Download
-        csv = dfp.to_csv(index=False).encode("utf-8")
-        st.download_button("Download dataset berlabel (CSV)", data=csv, file_name="homicide_with_clusters.csv", mime="text/csv")
+        # Contoh baris per klaster and download removed per user request
     
     else:
         st.markdown("""<div class="bullet-item"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg><span>Klik 'Jalankan Clustering & Visualisasi' untuk memulai.</span></div>""", unsafe_allow_html=True)
